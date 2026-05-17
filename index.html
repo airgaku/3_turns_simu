@@ -1,0 +1,167 @@
+    function showTurn() {
+      selectedChoice = null;
+      const item = cases[caseIndex];
+      const turn = item.turns[turnIndex];
+      render(`
+        ${topbarHtml()}
+        <div class="layout">
+          ${statsHtml()}
+          <div class="card">
+            <span class="badge">${item.caseTitle}</span>
+            <h2>${turn.turnTitle}</h2>
+            <div class="ai-box">
+              <div class="ai-label">AIの一見もっともらしい提案</div>
+              <p>${turn.aiSuggestion}</p>
+            </div>
+            <h3>${turn.question}</h3>
+            <div class="choices">
+              ${turn.choices.map((choice, index) => `
+                <button class="choice" onclick="choose(${index})">
+                  <span class="letter">${choice.label}</span>
+                  <span>${choice.text}</span>
+                </button>
+              `).join("")}
+            </div>
+          </div>
+        </div>
+      `);
+    }
+
+    function choose(choiceIndex) {
+      if (selectedChoice) return;
+      const turn = cases[caseIndex].turns[turnIndex];
+      const choice = turn.choices[choiceIndex];
+      selectedChoice = choice;
+      totalScore += choice.score;
+      Object.keys(choice.changes).forEach(key => {
+        params[key] = clamp(params[key] + choice.changes[key]);
+      });
+      showFeedback(choiceIndex);
+    }
+
+    function formatDelta(value) {
+      return value > 0 ? `+${value}` : `${value}`;
+    }
+
+    function showFeedback(choiceIndex) {
+      const item = cases[caseIndex];
+      const turn = item.turns[turnIndex];
+      const choice = turn.choices[choiceIndex];
+      render(`
+        ${topbarHtml(1)}
+        <div class="layout">
+          ${statsHtml()}
+          <div class="card">
+            <span class="badge">${turn.turnTitle}</span>
+            <h2>${turn.question}</h2>
+            <div class="choices">
+              ${turn.choices.map((option, index) => `
+                <button class="choice ${index === choiceIndex ? `selected ${choice.result}` : ""}" disabled>
+                  <span class="letter">${option.label}</span>
+                  <span>${option.text}</span>
+                </button>
+              `).join("")}
+            </div>
+          </div>
+          <div class="feedback ${choice.result}">
+            <div class="feedback-title">${resultLabels[choice.result]}</div>
+            <p>${choice.feedback}</p>
+            <div class="delta-list">
+              ${Object.keys(choice.changes).map(key => `
+                <span class="delta">${statLabels[key]} ${formatDelta(choice.changes[key])}</span>
+              `).join("")}
+              <span class="delta">このターン ${choice.score}点</span>
+            </div>
+          </div>
+          <button class="primary" onclick="nextStep()">次へ</button>
+        </div>
+      `);
+    }
+
+    function nextStep() {
+      turnIndex += 1;
+      if (turnIndex >= cases[caseIndex].turns.length) {
+        showCaseSummary();
+      } else {
+        showTurn();
+      }
+    }
+
+    function showCaseSummary() {
+      const item = cases[caseIndex];
+      render(`
+        ${topbarHtml()}
+        <div class="layout">
+          ${statsHtml()}
+          <div class="card">
+            <span class="badge theme">ケースまとめ</span>
+            <h2>${item.caseTitle}</h2>
+            <p>${item.summary}</p>
+          </div>
+          <button class="primary" onclick="nextCase()">${caseIndex === cases.length - 1 ? "次へ" : "次のケースへ"}</button>
+        </div>
+      `);
+    }
+
+    function nextCase() {
+      caseIndex += 1;
+      if (caseIndex >= cases.length) {
+        showResult();
+      } else {
+        startCase();
+      }
+    }
+
+    function getDiagnosis(score) {
+      if (score <= 8) {
+        return {
+          type: "安全確認マスタータイプ",
+          text: "安全を大切に考えられています。ただし、安全だけで参加の機会を狭めすぎない視点も大切です。"
+        };
+      }
+      if (score <= 16) {
+        return {
+          type: "声かけチェッカータイプ",
+          text: "子どもへの配慮に気づけています。次は、環境やクラス全体をどう変えるかにも目を向けてみましょう。"
+        };
+      }
+      if (score <= 20) {
+        return {
+          type: "教室全体を見るファシリテータータイプ",
+          text: "本人だけでなく、周囲の子どもや授業環境も含めて考えられています。"
+        };
+      }
+      return {
+        type: "支援改善クリエイタータイプ",
+        text: "身体、環境、制度、関係性を組み合わせて、参加条件を再設計する視点があります。"
+      };
+    }
+
+    function showResult() {
+      const diagnosis = getDiagnosis(totalScore);
+      render(`
+        <div class="hero">
+          <span class="badge">総合診断</span>
+          <h1>${totalScore} / 24点</h1>
+          <div class="diagnosis">${diagnosis.type}</div>
+          <p>${diagnosis.text}</p>
+          <div class="learning">教師は子どもの身体を変えることはできない。けれど、参加条件を変えることはできる。</div>
+          <br>
+          <button class="primary" onclick="restart()">もう一度プレイする</button>
+        </div>
+      `);
+    }
+
+    function restart() {
+      caseIndex = 0;
+      turnIndex = 0;
+      totalScore = 0;
+      params = resetParams();
+      selectedChoice = null;
+      showStart();
+    }
+
+    showStart();
+  </script>
+</body>
+</html>
